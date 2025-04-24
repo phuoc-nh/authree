@@ -1,30 +1,74 @@
-# Use an official Python base image with build tools
-FROM python:3.11-slim
+# -------------------------
+# STAGE 1: Build with tools
+# -------------------------
+FROM python:3.10.3-slim-bullseye
 
-# Install system dependencies for dlib & face_recognition
-RUN apt-get update && apt-get install -y \
+RUN apt-get -y update
+RUN apt-get install -y --fix-missing \
     build-essential \
     cmake \
-    libboost-all-dev \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
+    gfortran \
+    git \
+    wget \
+    curl \
+    graphicsmagick \
+    libgraphicsmagick1-dev \
+    libatlas-base-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libgtk2.0-dev \
     libjpeg-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
+    liblapack-dev \
+    libswscale-dev \
+    pkg-config \
+    python3-dev \
+    python3-numpy \
+    software-properties-common \
+    zip \
+    && apt-get clean && rm -rf /tmp/* /var/tmp/*
 
-# Set working directory
+RUN cd ~ && \
+    mkdir -p dlib && \
+    git clone -b 'v19.9' --single-branch https://github.com/davisking/dlib.git dlib/ && \
+    cd  dlib/ && \
+    python3 setup.py install --yes USE_AVX_INSTRUCTIONS
+
+
+# WORKDIR /app
+# COPY . .
+
+# # Install your Python dependencies
+# RUN pip3 install --upgrade pip setuptools wheel
+# RUN pip3 install -r requirements.txt
+
+# # -------------------------
+# # STAGE 2: Runtime image
+# # -------------------------
+# FROM python:3.10.3-slim-bullseye
+
+# WORKDIR /app
+
+# # Copy installed packages from build stage
+# COPY --from=build /usr/local/lib/python3.10 /usr/local/lib/python3.10
+# COPY --from=build /usr/local/bin /usr/local/bin
+# COPY --from=build /usr/local/include /usr/local/include
+# COPY --from=build /usr/local/share /usr/local/share
+
+# # Copy app code
+# COPY . .
+
+# EXPOSE 8000
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy your FastAPI project
+COPY . /app
 WORKDIR /app
 
-# Copy code
-COPY . /app
+# Install Python requirements
+RUN pip3 install --upgrade pip
+RUN pip3 install -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Expose port for uvicorn
+EXPOSE 8000
 
-# Expose port
-EXPOSE 8080
-
-# Run the app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run your FastAPI app with uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
